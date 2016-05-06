@@ -1,4 +1,16 @@
 import Twit from 'twit'
+import google from 'googleapis'
+const key = require('../jwt-key.json')
+
+const jwtClient = new google.auth.JWT(
+  key.client_email,
+  null,
+  key.private_key,
+  ['https://www.googleapis.com/auth/drive'],
+  null
+)
+
+const drive = google.drive({ version: 'v3' })
 
 const bot = new Twit({
   consumer_key: process.env.TWITTER_CONSUMER_KEY,
@@ -8,7 +20,7 @@ const bot = new Twit({
 })
 
 // connect to stream mentioning bot
-const stream = Bot.stream('statuses/filter', {
+const stream = bot.stream('statuses/filter', {
   track: [process.env.BOT_USERNAME]
 })
 
@@ -34,8 +46,29 @@ if (process.env.OWNER_USERNAME) {
   })
 }
 
+jwtClient.authorize((err, tokens) => {
+  console.log(tokens, err, process.env.GOOGLE_FILE_ID)
+  drive.files.export({
+    auth: jwtClient,
+    fileId: process.env.GOOGLE_FILE_ID,
+    mimeType: 'application/vnd.google-apps.script+json',
+  }, (err, res) => {
+    console.log(res, err)
+  })
+})
+
 stream.on('tweet', (tweet) => {
-  const replyTo = `@${tweet.user.screenName}`
-  replyToTweet(tweet.id_str, `${replyTo} hello`)
+  const replyTo = `@${tweet.user.screen_name}`
+
+  jwtClient.authorize((err, tokens) => {
+    drive.files.export({
+      auth: jwtClient,
+      fileId: process.env.GOOGLE_FILE_ID,
+      mimeType: 'application/vnd.google-apps.script+json',
+    }, (err, res) => {
+      console.log(res)
+      replyToTweet(tweet.id_str, `${replyTo} hello`)
+    })
+  })
 })
 
