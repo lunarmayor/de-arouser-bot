@@ -1,5 +1,7 @@
 import Twit from 'twit'
 import google from 'googleapis'
+import parse from 'csv-parse'
+import { flatten, sample } from 'lodash'
 const key = require('../jwt-key.json')
 
 const jwtClient = new google.auth.JWT(
@@ -46,29 +48,18 @@ if (process.env.OWNER_USERNAME) {
   })
 }
 
-jwtClient.authorize((err, tokens) => {
-  console.log(tokens, err, process.env.GOOGLE_FILE_ID)
-  drive.files.export({
-    auth: jwtClient,
-    fileId: process.env.GOOGLE_FILE_ID,
-    mimeType: 'application/vnd.google-apps.script+json',
-  }, (err, res) => {
-    console.log(res, err)
-  })
-})
-
 stream.on('tweet', (tweet) => {
   const replyTo = `@${tweet.user.screen_name}`
-
   jwtClient.authorize((err, tokens) => {
     drive.files.export({
       auth: jwtClient,
       fileId: process.env.GOOGLE_FILE_ID,
-      mimeType: 'application/vnd.google-apps.script+json',
+      mimeType: 'text/csv',
     }, (err, res) => {
-      console.log(res)
-      replyToTweet(tweet.id_str, `${replyTo} hello`)
+      parse(res, {}, (error, output) => {
+        let sampledResponse = sample(flatten(output))
+        replyToTweet(tweet.id_str, `${replyTo} ${sampledResponse}`)
+      })
     })
   })
 })
-
